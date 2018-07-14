@@ -2,8 +2,28 @@ package cpu
 
 import (
   "testing"
-  "fmt"
+  // "fmt"
 )
+
+func checkMem(cpu *CPU, addr uint16, val uint8, t *testing.T) {
+  if cpu.memory[addr] != val {
+    t.Errorf("Incorrect memory[%v]. Got %v, wanted %v", addr, cpu.memory[addr], val)
+  }
+}
+
+func checkStimer(cpu *CPU, val uint8, t *testing.T) {
+  if cpu.stimer != val {
+    t.Errorf("Incorrect stimer. Got %v, wanted %v", cpu.stimer, val)
+
+  }
+}
+
+func checkDtimer(cpu *CPU, val uint8, t *testing.T) {
+  if cpu.dtimer != val {
+    t.Errorf("Incorrect dtimer. Got %v, wanted %v", cpu.dtimer, val)
+
+  }
+}
 
 func checkI(cpu *CPU, val uint16, t *testing.T) {
   if cpu.i != val {
@@ -167,6 +187,127 @@ func TestMathAdd(t *testing.T) {
 
   cpu.executeInstruction(0xf01e)
   checkI(&cpu, 0x123 + 0x45, t)
-  fmt.Println("add v0 v1")
-
 }
+
+func TestMathSub(t *testing.T) {
+  cpu := NewCPU()
+  cpu.setRegister(0, 0x43)
+  cpu.setRegister(1, 0x21)
+
+  cpu.executeInstruction(0x8015) // sub v0 v1
+  checkReg(&cpu, 0, 0x43-0x21, t)
+  checkReg(&cpu, 0xf, 0, t)
+
+  cpu.setRegister(0, 0x12)
+  cpu.setRegister(1, 0x34)
+
+  cpu.executeInstruction(0x8015) // sub v0 v1
+  checkReg(&cpu, 0, 222, t)
+  checkReg(&cpu, 0xf, 1, t)
+
+  cpu.setRegister(0, 0x34)
+  cpu.setRegister(1, 0x12)
+
+  cpu.executeInstruction(0x8017) // sub v0 v1
+  checkReg(&cpu, 0, 222, t)
+  checkReg(&cpu, 0xf, 1, t)
+
+  cpu.setRegister(0, 0x12)
+  cpu.setRegister(1, 0x34)
+
+  cpu.executeInstruction(0x8017) // sub v0 v1
+  checkReg(&cpu, 0, 0x34-0x12, t)
+  checkReg(&cpu, 0xf, 0, t)
+}
+
+func TestMathBitwise(t *testing.T) {
+  cpu := NewCPU()
+  cpu.setRegister(0, 0x12)
+  cpu.setRegister(1, 0x34)
+  
+  cpu.executeInstruction(0x8011)
+  checkReg(&cpu, 0, 0x34|0x12, t)
+
+  cpu.setRegister(0, 0x12)
+  cpu.setRegister(1, 0x34)
+  
+  cpu.executeInstruction(0x8012)
+  checkReg(&cpu, 0, 0x34&0x12, t)
+
+  cpu.setRegister(0, 0x12)
+  cpu.setRegister(1, 0x34)
+  
+  cpu.executeInstruction(0x8013)
+  checkReg(&cpu, 0, 0x34^0x12, t)
+}
+
+func TestLoadReg(t *testing.T) {
+  cpu := NewCPU()
+
+  cpu.executeInstruction(0x60ab)
+  checkReg(&cpu, 0, 0xab, t)  
+
+  cpu.setRegister(0, 0)
+  cpu.setRegister(1, 0xff)
+
+  cpu.executeInstruction(0x8010)
+  checkReg(&cpu, 0, 0xff, t)
+
+  cpu.i = 0x200
+
+  cpu.executeInstruction(0xafff)
+  checkI(&cpu, 0xfff, t)
+}
+
+func TestLoadTimers(t *testing.T) {
+  cpu := NewCPU()
+  cpu.setRegister(0, 0xab)
+
+  cpu.executeInstruction(0xf015)
+  checkDtimer(&cpu, 0xab, t)
+
+  cpu.executeInstruction(0xf018)
+  checkStimer(&cpu, 0xab, t)
+
+  cpu.setRegister(0,0)
+  
+  cpu.executeInstruction(0xf007)
+  checkReg(&cpu, 0, 0xab, t)
+}
+
+func TestLoadBcd(t *testing.T) {
+  cpu := NewCPU()
+  cpu.setRegister(0, 0xab)
+
+  cpu.executeInstruction(0xf033)
+  checkMem(&cpu, cpu.i+0, 0xab/100, t)
+  checkMem(&cpu, cpu.i+1, (0xab % 100)/10, t)
+  checkMem(&cpu, cpu.i+2, (0xab % 10), t) 
+}
+
+func TestLoadMem(t *testing.T) {
+  cpu := NewCPU()
+  cpu.setRegister(0, 0xde)
+  cpu.setRegister(1, 0xad)
+  cpu.setRegister(2, 0xbe)
+  cpu.setRegister(3, 0xef)
+  cpu.i = 0x123
+
+  cpu.executeInstruction(0xf355)
+  checkMem(&cpu, cpu.i+0, 0xde, t)
+  checkMem(&cpu, cpu.i+1, 0xad, t)
+  checkMem(&cpu, cpu.i+2, 0xbe, t)
+  checkMem(&cpu, cpu.i+3, 0xef, t)
+
+  cpu.setRegister(0, 0)
+  cpu.setRegister(1, 0)
+  cpu.setRegister(2, 0)
+  cpu.setRegister(3, 0)
+
+  cpu.executeInstruction(0xf365)
+  checkReg(&cpu, 0, 0xde, t)
+  checkReg(&cpu, 1, 0xad, t) 
+  checkReg(&cpu, 2, 0xbe, t) 
+  checkReg(&cpu, 3, 0xef, t) 
+}
+

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"chip8/cpu"
+	"cryp-8/cpu"
 	"fmt"
 )
 
