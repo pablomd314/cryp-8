@@ -18,7 +18,7 @@ type CPU struct {
   stimer  uint8
   key   [16]bool
   display [64*32]bool
-  refreshScreen bool
+  RefreshScreen bool
 }
 
 func max(a, b uint8) uint8 {
@@ -28,6 +28,14 @@ func max(a, b uint8) uint8 {
     return b
 }
 
+func (cpu *CPU) SetKey(k uint8) {
+  cpu.key[k] = true
+  fmt.Printf("key set %x\n",k)
+}
+
+func (cpu *CPU) Display() []bool {
+  return cpu.display[:]
+}
 
 func getAddress(instruction uint16) uint16 {
   return instruction & 0x0FFF 
@@ -61,22 +69,36 @@ func NewCPU() CPU {
   var cpu CPU
   cpu.pc = 0x200
   copy(cpu.memory[:], fonts[:])
-  cpu.refreshScreen = false
+  cpu.RefreshScreen = false
   return cpu
+}
+
+func (cpu *CPU) LoadRom(buff []uint8) {
+  for i, val := range buff {
+    cpu.memory[0x200 + i] = val
+  } 
 }
 
 func (cpu *CPU) RunCycle() {
   instruction := uint16(cpu.memory[cpu.pc]) << 8 | uint16(cpu.memory[cpu.pc + 1]);
   cpu.executeInstruction(instruction)
+  
   cpu.dtimer = max(0, cpu.dtimer - 1)
   if cpu.stimer == 1 {
-    fmt.Println("BOOP")
+    // fmt.Println("BOOP")
   }
+  
   cpu.stimer = max(0, cpu.stimer - 1)
 }
 
+func (cpu *CPU) clearKeys() {
+  for i := range cpu.key {
+    cpu.key[i] = false
+  }
+}
+
 func (cpu *CPU) executeInstruction(instruction uint16) {
-  fmt.Println("%x", instruction)
+  // fmt.Printf("instruction %x\n", instruction)
   switch 0xF000 & instruction {
     case 0x0000:
       switch 0x00FF & instruction {
@@ -84,7 +106,7 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
           for i, _ := range cpu.display {
             cpu.display[i] = false
           }
-          cpu.refreshScreen = true
+          cpu.RefreshScreen = true
           cpu.pc += 2
         case 0x00EE:
           cpu.sp--
@@ -170,35 +192,40 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
       cpu.setRegister(getX(instruction), uint8(rand.Uint32()) & get8BitConstant(instruction))
       cpu.pc    += 2
     case 0xD000:
-      vx := cpu.getRegister(getX(instruction))
-      vy := cpu.getRegister(getY(instruction))
-      n  := get4BitConstant(instruction)
+      vx := uint16(cpu.getRegister(getX(instruction)))
+      vy := uint16(cpu.getRegister(getY(instruction)))
+      n  := uint16(get4BitConstant(instruction))
       var pixel uint8
       cpu.setRegister(0xF, 0)
-      for j := uint8(0); j < n; j++ {
+      for j := uint16(0); j < n; j++ {
         pixel = cpu.memory[cpu.i + uint16(j)]
-        for k := uint8(0); k < 8; k++ {
-          if (pixel & (0x80 >> k)) == 1 { //pixel is set
+        for k := uint16(0); k < 8; k++ {
+          if (pixel & (0x80 >> k)) == (0x80 >> k) { //pixel is set
+            // fmt.Printf("drawing pixel %v, row  %v\n", k, j)
             if cpu.display[vx + k + (vy + j)*64] {
               cpu.setRegister(0xF, 1)
             }
+            // fmt.Printf("display index %v\n", vx + k + (vy + j)*64)
             cpu.display[vx + k + (vy + j)*64] = !cpu.display[vx + k + (vy + j)*64]
           } 
         }
       }
-      cpu.refreshScreen = true
+      cpu.RefreshScreen = true
       cpu.pc += 2
     case 0xE000:
+      fmt.Printf("got key %x\n", cpu.getRegister(getX(instruction)))     
       switch 0x00FF & instruction {
         case 0x009E:
           if cpu.keyPressed(cpu.getRegister(getX(instruction))) {
             cpu.pc += 2
           }
+          cpu.key[cpu.getRegister(getX(instruction))] = false
           cpu.pc += 2
         case 0x00A1:
           if !cpu.keyPressed(cpu.getRegister(getX(instruction))) {
             cpu.pc += 2
           }
+          cpu.key[cpu.getRegister(getX(instruction))] = false
           cpu.pc += 2
       }
     case 0xF000:
@@ -208,6 +235,8 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
           cpu.pc += 2
         case 0x000A:
           if k := cpu.getKey(); k != 0xFF {
+            fmt.Printf("got key %x\n", k)
+            cpu.clearKeys()
             cpu.setRegister(getX(instruction), k)
             cpu.pc  += 2
           }

@@ -2,7 +2,8 @@ package cpu
 
 import (
   "testing"
-  // "fmt"
+  "fmt"
+  "os"
 )
 
 func checkMem(cpu *CPU, addr uint16, val uint8, t *testing.T) {
@@ -311,3 +312,28 @@ func TestLoadMem(t *testing.T) {
   checkReg(&cpu, 3, 0xef, t) 
 }
 
+func TestDraw(t *testing.T) {
+  cpu := NewCPU()
+  cpu.i = 0
+  cpu.setRegister(0, 0)
+  cpu.setRegister(1, 0)
+  cpu.executeInstruction(0xd015)
+  draw(&cpu)
+}
+
+func draw(cpu *CPU) {
+  f, err := os.Create("./out.img")
+  if err != nil {
+    panic(err)
+  }
+  out := []byte{}
+  fmt.Println("len", len(cpu.Display()))
+  for _, val := range cpu.Display() {
+    if val {
+      out = append(out, byte(255))
+    } else {
+      out = append(out, byte(0))
+    }
+  }
+  f.Write(out)
+}
