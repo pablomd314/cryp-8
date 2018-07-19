@@ -56,6 +56,8 @@ var (
     0.5, 0.5, 0,
     0.5, -0.5, 0,
   }
+  shouldRun = true
+
 )
 
 type cell struct {
@@ -69,39 +71,17 @@ type cell struct {
     y int
 }
 
-// checkState determines the state of the cell for the next tick of the game.
-func (c *cell) checkState(cells [][]*cell) {
-    c.alive = c.aliveNext
-    c.aliveNext = c.alive
-    
-    liveCount := c.liveNeighbors(cells)
-    if c.alive {
-        // 1. Any live cell with fewer than two live neighbours dies, as if caused by underpopulation.
-        if liveCount < 2 {
-            c.aliveNext = false
-        }
-        
-        // 2. Any live cell with two or three live neighbours lives on to the next generation.
-        if liveCount == 2 || liveCount == 3 {
-            c.aliveNext = true
-        }
-        
-        // 3. Any live cell with more than three live neighbours dies, as if by overpopulation.
-        if liveCount > 3 {
-            c.aliveNext = false
-        }
-    } else {
-        // 4. Any dead cell with exactly three live neighbours becomes a live cell, as if by reproduction.
-        if liveCount == 3 {
-            c.aliveNext = true
-        }
-    }
-}
 
 func (h *app) onKey(w *glfw.Window, key glfw.Key, scancode int,
   action glfw.Action, mods glfw.ModifierKey) {
-  if key == glfw.KeyEscape && action == glfw.Press {
+  if action != glfw.Press {
+    return  
+  }
+  if key == glfw.KeyEscape {
     w.SetShouldClose(true)
+  }
+  if key == glfw.KeySpace {
+    shouldRun = true
   }
   switch key {
     case glfw.Key0:
@@ -139,40 +119,6 @@ func (h *app) onKey(w *glfw.Window, key glfw.Key, scancode int,
   }
 }
 
-
-// liveNeighbors returns the number of live neighbors for a cell.
-func (c *cell) liveNeighbors(cells [][]*cell) int {
-    var liveCount int
-    add := func(x, y int) {
-        // If we're at an edge, check the other side of the board.
-        if x == len(cells) {
-            x = 0
-        } else if x == -1 {
-            x = len(cells) - 1
-        }
-        if y == len(cells[x]) {
-            y = 0
-        } else if y == -1 {
-            y = len(cells[x]) - 1
-        }
-        
-        if cells[x][y].alive {
-            liveCount++
-        }
-    }
-    
-    add(c.x-1, c.y)   // To the left
-    add(c.x+1, c.y)   // To the right
-    add(c.x, c.y+1)   // up
-    add(c.x, c.y-1)   // down
-    add(c.x-1, c.y+1) // top-left
-    add(c.x+1, c.y+1) // top-right
-    add(c.x-1, c.y-1) // bottom-left
-    add(c.x+1, c.y-1) // bottom-right
-    
-    return liveCount
-}
-
 func main() {
 
   runtime.LockOSThread()
@@ -186,7 +132,7 @@ func main() {
   h := app{&cpu}
   window.SetKeyCallback(h.onKey)
 
-  f, err := os.Open("./15.ch8")
+  f, err := os.Open("./bowling.ch8")
 
   b1 := make([]byte, 4096-0x200)
   _, err = f.Read(b1)
@@ -198,8 +144,11 @@ func main() {
     cells := makeCells()
 
   for i := 0; !window.ShouldClose(); i %= 100 {
-    t := time.Now() 
-    cpu.RunCycle()
+    t := time.Now()
+    if shouldRun {
+      cpu.RunCycle()
+      // shouldRun = false
+    }
     glfw.PollEvents()
 
     if cpu.RefreshScreen {        
@@ -214,7 +163,7 @@ func main() {
     }
 
     if i == 99 {
-      fmt.Printf("cycles per second: %v\n", calcCPS(iteration_times[:]))
+      // fmt.Printf("cycles per second: %v\n", calcCPS(iteration_times[:]))
     }
     time.Sleep(time.Second/time.Duration(fps) - time.Since(t))
     iteration_times[i] = time.Since(t).Seconds()

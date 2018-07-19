@@ -82,8 +82,9 @@ func (cpu *CPU) LoadRom(buff []uint8) {
 func (cpu *CPU) RunCycle() {
   instruction := uint16(cpu.memory[cpu.pc]) << 8 | uint16(cpu.memory[cpu.pc + 1]);
   cpu.executeInstruction(instruction)
-  
-  cpu.dtimer = max(0, cpu.dtimer - 1)
+  if cpu.dtimer != 0 {
+    cpu.dtimer = 0
+  }
   if cpu.stimer == 1 {
     // fmt.Println("BOOP")
   }
@@ -98,7 +99,7 @@ func (cpu *CPU) clearKeys() {
 }
 
 func (cpu *CPU) executeInstruction(instruction uint16) {
-  // fmt.Printf("instruction %x\n", instruction)
+  fmt.Printf("instruction %x\n", instruction)
   switch 0xF000 & instruction {
     case 0x0000:
       switch 0x00FF & instruction {
@@ -124,6 +125,9 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
       }
       cpu.pc    += 2
     case 0x4000:
+      fmt.Println(cpu.getRegister(getX(instruction)))
+      fmt.Println((getX(instruction)))
+      fmt.Println(get8BitConstant(instruction))
       if cpu.getRegister(getX(instruction)) != get8BitConstant(instruction) {
         cpu.pc  += 2
       }
@@ -142,6 +146,7 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
     case 0x8000:
       vx := cpu.getRegister(getX(instruction))
       vy := cpu.getRegister(getY(instruction))
+      fmt.Println(vx, vy)
       switch 0x000F & instruction {
         case 0x0000:
           cpu.setRegister(getX(instruction), vy)
@@ -159,9 +164,9 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
           }
         case 0x0005:
           cpu.setRegister(getX(instruction), vx - vy)
-          cpu.setRegister(0xF, 0)
+          cpu.setRegister(0xF, 1)
           if vy > vx {
-            cpu.setRegister(0xF, 1)
+            cpu.setRegister(0xF, 0)
           }
         case 0x0006:
           cpu.setRegister(getX(instruction), vy >> 1)
@@ -184,10 +189,13 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
       }
       cpu.pc    += 2
     case 0xA000:
-      cpu.i     = instruction & getAddress(instruction)
+      cpu.i     =  getAddress(instruction)
       cpu.pc    += 2
     case 0xB000:
       cpu.pc    = uint16(cpu.getRegister(0)) + getAddress(instruction)
+      if cpu.pc > 0xff {
+
+      }
     case 0xC000:
       cpu.setRegister(getX(instruction), uint8(rand.Uint32()) & get8BitConstant(instruction))
       cpu.pc    += 2
@@ -202,6 +210,10 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
         for k := uint16(0); k < 8; k++ {
           if (pixel & (0x80 >> k)) == (0x80 >> k) { //pixel is set
             // fmt.Printf("drawing pixel %v, row  %v\n", k, j)
+            if vx > 63 {
+              fmt.Println(vx)
+              panic(errors.New("weewoo"))
+            }
             if cpu.display[vx + k + (vy + j)*64] {
               cpu.setRegister(0xF, 1)
             }
@@ -213,30 +225,33 @@ func (cpu *CPU) executeInstruction(instruction uint16) {
       cpu.RefreshScreen = true
       cpu.pc += 2
     case 0xE000:
-      fmt.Printf("got key %x\n", cpu.getRegister(getX(instruction)))     
       switch 0x00FF & instruction {
         case 0x009E:
           if cpu.keyPressed(cpu.getRegister(getX(instruction))) {
             cpu.pc += 2
+            cpu.key[cpu.getRegister(getX(instruction))] = false
           }
-          cpu.key[cpu.getRegister(getX(instruction))] = false
           cpu.pc += 2
         case 0x00A1:
           if !cpu.keyPressed(cpu.getRegister(getX(instruction))) {
             cpu.pc += 2
+          } else {
+            cpu.key[cpu.getRegister(getX(instruction))] = false
           }
-          cpu.key[cpu.getRegister(getX(instruction))] = false
           cpu.pc += 2
       }
     case 0xF000:
       switch 0x00FF & instruction {
         case 0x0007:
+          fmt.Println("dtimer", cpu.dtimer)
           cpu.setRegister(getX(instruction), cpu.dtimer)
           cpu.pc += 2
         case 0x000A:
           if k := cpu.getKey(); k != 0xFF {
             fmt.Printf("got key %x\n", k)
+            fmt.Println(cpu.key)
             cpu.clearKeys()
+            fmt.Println(cpu.key)
             cpu.setRegister(getX(instruction), k)
             cpu.pc  += 2
           }
