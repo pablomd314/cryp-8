@@ -132,7 +132,7 @@ func main() {
   h := app{&cpu}
   window.SetKeyCallback(h.onKey)
 
-  f, err := os.Open("./bowling.ch8")
+  f, err := os.Open("./connect4.ch8")
 
   b1 := make([]byte, 4096-0x200)
   _, err = f.Read(b1)
